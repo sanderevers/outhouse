@@ -41,6 +41,11 @@ def create_app():
     d.register(aiohttp.ClientSession, manage_clientsession)
     app = aiohttp.web.Application()
     app['d'] = d
+    app.on_shutdown.append(teardown_deps)
+    return app
+
+async def teardown_deps(app):
+    await app['d'].async_teardown()
 ```
 
 Next, use the `ClientSession` instance somewhere in your app:
@@ -52,3 +57,33 @@ async def somewhere(app):
         ...
 ```
 
+The first call to `aget` will setup the `ClientSession` instance.
+Subsequent calls will return the same instance.
+
+An often occurring pattern is injecting dependencies into dependencies:
+
+```python
+class TwitterClient:
+    def __init__(self,config,session):
+        self.config = config
+        self.session = session
+
+    async def setup_access_token(self):
+        url = self.config.TWITTER_TOKEN_URL
+        async with self.session.post(url, ...) as resp:
+            ...
+
+    @staticmethod
+    @asynccontextmanager
+    async def manage_me(d):
+        yield TwitterClient(d['config'], await d.aget(aiohttp.ClientSession))
+```
+At the app configuration, pass the dependency provider:
+```python
+d.register(TwitterClient,TwitterClient.manage_me,d)
+```
+Registering simple dependencies is possible without a context manager.
+```python
+d.register('config',lambda: read_config_file())
+
+```

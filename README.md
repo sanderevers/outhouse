@@ -76,7 +76,9 @@ class TwitterClient:
     @staticmethod
     @asynccontextmanager
     async def manage_me(d):
-        yield TwitterClient(d['config'], await d.aget(aiohttp.ClientSession))
+        client = TwitterClient(d['config'], await d.aget(aiohttp.ClientSession))
+        await client.setup_access_token()
+        yield client
 ```
 At the app configuration, pass the dependency provider:
 ```python
